@@ -1,41 +1,41 @@
 'use client';
 
-import { Sector, SECTOR_COLORS, SECTOR_NAMES } from '@/types/company';
+import { SaaSCategory, SAAS_CATEGORY_COLORS, SAAS_CATEGORY_NAMES } from '@/types/saas';
 import { Card } from '@/components/ui/card';
 
-export const ALL_SECTORS: Sector[] = [
-  'technology',
-  'finance',
-  'healthcare',
-  'consumer',
-  'industrial',
-  'energy',
-  'materials',
-  'telecom',
-  'utilities',
-  'realEstate',
+export const ALL_SAAS_CATEGORIES: SaaSCategory[] = [
+  'crm',
+  'marketing',
+  'hrTech',
+  'fintech',
+  'communication',
+  'productivity',
+  'security',
+  'infrastructure',
+  'analytics',
+  'vertical',
 ];
 
-interface SectorLegendProps {
-  selectedSectors: Sector[];
-  onSectorToggle: (sector: Sector) => void;
+interface SaaSCategoryLegendProps {
+  selectedCategories: SaaSCategory[];
+  onCategoryToggle: (category: SaaSCategory) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
 }
 
-export function SectorLegend({
-  selectedSectors,
-  onSectorToggle,
+export function SaaSCategoryLegend({
+  selectedCategories,
+  onCategoryToggle,
   onSelectAll,
   onClearAll,
-}: SectorLegendProps) {
-  const allSelected = selectedSectors.length === ALL_SECTORS.length;
-  const noneSelected = selectedSectors.length === 0;
+}: SaaSCategoryLegendProps) {
+  const allSelected = selectedCategories.length === ALL_SAAS_CATEGORIES.length;
+  const noneSelected = selectedCategories.length === 0;
 
   return (
     <Card className="bg-white/90 backdrop-blur-sm border-gray-200 p-3 max-w-md">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-700">セクター</h3>
+        <h3 className="text-sm font-semibold text-gray-700">SaaSカテゴリ</h3>
         <div className="flex gap-2">
           <button
             onClick={onSelectAll}
@@ -56,27 +56,27 @@ export function SectorLegend({
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {ALL_SECTORS.map((sector) => {
-          const isSelected = selectedSectors.includes(sector);
+        {ALL_SAAS_CATEGORIES.map((category) => {
+          const isSelected = selectedCategories.includes(category);
           return (
             <button
-              key={sector}
-              onClick={() => onSectorToggle(sector)}
+              key={category}
+              onClick={() => onCategoryToggle(category)}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs transition-all border ${
                 isSelected
                   ? 'border-transparent'
                   : 'border-gray-300 opacity-40 hover:opacity-70'
               }`}
               style={{
-                backgroundColor: isSelected ? SECTOR_COLORS[sector] + '20' : 'transparent',
+                backgroundColor: isSelected ? SAAS_CATEGORY_COLORS[category] + '20' : 'transparent',
               }}
             >
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: SECTOR_COLORS[sector] }}
+                style={{ backgroundColor: SAAS_CATEGORY_COLORS[category] }}
               />
               <span className={isSelected ? 'text-gray-900' : 'text-gray-500'}>
-                {SECTOR_NAMES[sector]}
+                {SAAS_CATEGORY_NAMES[category]}
               </span>
             </button>
           );

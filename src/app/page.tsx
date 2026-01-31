@@ -1,58 +1,163 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Company } from '@/types/company';
+import { Company, Sector } from '@/types/company';
 import { CompanyInfoPanel } from '@/components/CompanyInfoPanel';
-import { SectorLegend } from '@/components/SectorLegend';
+import { SectorLegend, ALL_SECTORS } from '@/components/SectorLegend';
+import { VisualizationSwitcher, VisualizationMode } from '@/components/VisualizationSwitcher';
+import { useStockData } from '@/hooks/useStockData';
 
-// Dynamic import for 3D Canvas to avoid SSR issues with WebGL
+// Dynamic imports for 3D components to avoid SSR issues
 const CellularMarket = dynamic(
   () => import('@/components/CellularMarket').then((mod) => mod.CellularMarket),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-        <div className="text-gray-500 text-lg">3D空間を読み込み中...</div>
-      </div>
-    ),
-  }
+  { ssr: false, loading: () => <LoadingScreen /> }
 );
 
+const CityScapeMarket = dynamic(
+  () => import('@/components/CityScapeMarket').then((mod) => mod.CityScapeMarket),
+  { ssr: false, loading: () => <LoadingScreen /> }
+);
+
+const ChaosMapMarket = dynamic(
+  () => import('@/components/ChaosMapMarket').then((mod) => mod.ChaosMapMarket),
+  { ssr: false, loading: () => <LoadingScreen /> }
+);
+
+function LoadingScreen() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+      <div className="text-gray-500 text-lg">3D空間を読み込み中...</div>
+    </div>
+  );
+}
+
 export default function Home() {
+  // Company selection state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedSectors, setSelectedSectors] = useState<Sector[]>(ALL_SECTORS);
+
+  // Visualization mode
+  const [visualizationMode, setVisualizationMode] = useState<VisualizationMode>('cellular');
+
+  // Stock data - fetch from Yahoo Finance API
+  const { companies, loading, error, lastUpdated } = useStockData({
+    useMockData: false,
+    refreshInterval: 6 * 60 * 60 * 1000, // Refresh every 6 hours
+  });
+
+  // Filter companies by selected sectors
+  const filteredCompanies = useMemo(() => {
+    if (selectedSectors.length === 0) return [];
+    return companies.filter((company) => selectedSectors.includes(company.sector));
+  }, [companies, selectedSectors]);
+
+  // Handlers for sectors
+  const handleSectorToggle = (sector: Sector) => {
+    setSelectedSectors((prev) =>
+      prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]
+    );
+  };
+  const handleSelectAllSectors = () => setSelectedSectors(ALL_SECTORS);
+  const handleClearAllSectors = () => setSelectedSectors([]);
+
+  // Mode change handler - reset selection
+  const handleModeChange = (mode: VisualizationMode) => {
+    setVisualizationMode(mode);
+    setSelectedCompany(null);
+  };
+
+  // Get title and description based on mode
+  const getTitle = () => {
+    switch (visualizationMode) {
+      case 'cellular':
+        return 'Cellular Market';
+      case 'cityscape':
+        return 'City Scape Market';
+      case 'chaosmap':
+        return 'Chaos Map';
+      default:
+        return 'Market Visualization';
+    }
+  };
+
+  const getDescription = () => {
+    switch (visualizationMode) {
+      case 'cellular':
+        return '日本株式市場 3D可視化（セル方式）';
+      case 'cityscape':
+        return '日本株式市場 3D可視化（都市方式）';
+      case 'chaosmap':
+        return '日本株式市場 カオスマップ';
+      default:
+        return '日本株式市場 3D可視化';
+    }
+  };
 
   return (
     <main className="relative w-full h-screen bg-gray-50 overflow-hidden">
-      {/* 3D Cellular Market */}
+      {/* 3D Visualization */}
       <div className="absolute inset-0">
-        <CellularMarket
-          selectedCompany={selectedCompany}
-          onSelectCompany={setSelectedCompany}
-        />
+        {visualizationMode === 'cellular' && (
+          <CellularMarket
+            companies={filteredCompanies}
+            selectedCompany={selectedCompany}
+            onSelectCompany={setSelectedCompany}
+          />
+        )}
+        {visualizationMode === 'cityscape' && (
+          <CityScapeMarket
+            companies={filteredCompanies}
+            selectedCompany={selectedCompany}
+            onSelectCompany={setSelectedCompany}
+          />
+        )}
+        {visualizationMode === 'chaosmap' && (
+          <ChaosMapMarket
+            companies={companies}
+            selectedCompany={selectedCompany}
+            onSelectCompany={setSelectedCompany}
+            selectedSectors={selectedSectors}
+          />
+        )}
       </div>
 
       {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-10 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Cellular Market</h1>
-            <p className="text-sm text-gray-500">日本株式市場 3D可視化</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {getTitle()}
+            </h1>
+            <p className="text-sm text-gray-500">
+              {getDescription()}
+              {lastUpdated && (
+                <span className="ml-2 text-xs text-gray-400">
+                  更新: {lastUpdated.toLocaleTimeString('ja-JP')}
+                </span>
+              )}
+            </p>
           </div>
+          <VisualizationSwitcher mode={visualizationMode} onModeChange={handleModeChange} />
         </div>
       </header>
 
-      {/* Company Info Panel (Right side) */}
+      {/* Info Panel (Right side) */}
       <div className="absolute top-20 right-4 z-10">
         <CompanyInfoPanel company={selectedCompany} />
       </div>
 
-      {/* Sector Legend (Bottom left) */}
+      {/* Filter (Bottom left) */}
       <div className="absolute bottom-4 left-4 z-10">
-        <SectorLegend />
+        <SectorLegend
+          selectedSectors={selectedSectors}
+          onSectorToggle={handleSectorToggle}
+          onSelectAll={handleSelectAllSectors}
+          onClearAll={handleClearAllSectors}
+        />
       </div>
 
-      {/* Legend for colors (Bottom right) */}
+      {/* Legend (Bottom right) */}
       <div className="absolute bottom-4 right-4 z-10">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 p-3">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">騰落率</h3>
@@ -69,6 +174,21 @@ export default function Home() {
             <span>0%</span>
             <span>+3%</span>
           </div>
+          {(visualizationMode === 'cityscape' || visualizationMode === 'chaosmap') && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">高さ</h3>
+              <p className="text-xs text-gray-500">= 時価総額</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Company count */}
+      <div className="absolute top-20 left-4 z-10">
+        <div className="bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 px-3 py-2">
+          <span className="text-sm text-gray-700">
+            表示中: <span className="font-bold">{filteredCompanies.length}</span> 社
+          </span>
         </div>
       </div>
 
@@ -78,6 +198,22 @@ export default function Home() {
           ドラッグで回転 • スクロールでズーム • 企業をクリックで詳細表示
         </p>
       </div>
+
+      {/* Loading/Error indicator */}
+      {loading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm">
+            データを読み込み中...
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+          <div className="bg-red-500 text-white px-4 py-2 rounded-full text-sm">
+            エラー: {error}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

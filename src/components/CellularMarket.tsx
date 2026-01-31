@@ -5,7 +5,6 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { Company, SECTOR_POSITIONS } from '@/types/company';
-import { mockCompanies } from '@/data/companyData';
 import { CompanyCell } from './CompanyCell';
 
 interface CellularMarketSceneProps {
@@ -89,11 +88,12 @@ function CellularMarketScene({ companies, selectedCompany, onSelectCompany }: Ce
 }
 
 interface CellularMarketProps {
+  companies: Company[];
   selectedCompany: Company | null;
   onSelectCompany: (company: Company | null) => void;
 }
 
-export function CellularMarket({ selectedCompany, onSelectCompany }: CellularMarketProps) {
+export function CellularMarket({ companies, selectedCompany, onSelectCompany }: CellularMarketProps) {
   return (
     <div className="w-full h-full">
       <Canvas
@@ -111,7 +111,7 @@ export function CellularMarket({ selectedCompany, onSelectCompany }: CellularMar
           target={[0, 0, 0]}
         />
         <CellularMarketScene
-          companies={mockCompanies}
+          companies={companies}
           selectedCompany={selectedCompany}
           onSelectCompany={onSelectCompany}
         />
