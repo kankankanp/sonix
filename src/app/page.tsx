@@ -33,6 +33,54 @@ function LoadingScreen() {
   );
 }
 
+// Cache status badge component
+function CacheStatusBadge({
+  cacheSource,
+  cacheAge,
+  loading,
+  onRefresh,
+}: {
+  cacheSource: 'none' | 'client' | 'server' | 'fresh';
+  cacheAge: number;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const getStatusConfig = () => {
+    switch (cacheSource) {
+      case 'fresh':
+        return { label: '最新', color: 'bg-green-100 text-green-700', icon: '●' };
+      case 'server':
+        return { label: `サーバーキャッシュ (${cacheAge}分前)`, color: 'bg-blue-100 text-blue-700', icon: '◐' };
+      case 'client':
+        return { label: `ローカルキャッシュ (${cacheAge}分前)`, color: 'bg-yellow-100 text-yellow-700', icon: '◑' };
+      default:
+        return { label: 'モックデータ', color: 'bg-gray-100 text-gray-700', icon: '○' };
+    }
+  };
+
+  const config = getStatusConfig();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-xs px-2 py-1 rounded-full ${config.color}`}>
+        {config.icon} {config.label}
+      </span>
+      <button
+        onClick={onRefresh}
+        disabled={loading}
+        className={`text-xs px-2 py-1 rounded-full transition-colors ${
+          loading
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800'
+        }`}
+        title="最新データを取得"
+      >
+        {loading ? '更新中...' : '更新'}
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   // Company selection state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -45,7 +93,7 @@ export default function Home() {
   const isChaosMapMode = visualizationMode === 'chaosmap';
 
   // Stock data - fetch from Yahoo Finance API
-  const { companies, loading, error, lastUpdated } = useStockData({
+  const { companies, loading, error, lastUpdated, cacheSource, cacheAge, refetch } = useStockData({
     useMockData: false,
     refreshInterval: 6 * 60 * 60 * 1000, // Refresh every 6 hours
   });
@@ -87,6 +135,11 @@ export default function Home() {
   const handleModeChange = (mode: VisualizationMode) => {
     setVisualizationMode(mode);
     setSelectedCompany(null);
+  };
+
+  // Force refresh handler
+  const handleRefresh = () => {
+    refetch(true); // Force refresh from API
   };
 
   // Get title and description based on mode
@@ -151,14 +204,22 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-gray-900">
               {getTitle()}
             </h1>
-            <p className="text-sm text-gray-500">
-              {getDescription()}
-              {lastUpdated && (
-                <span className="ml-2 text-xs text-gray-400">
-                  更新: {lastUpdated.toLocaleTimeString('ja-JP')}
-                </span>
-              )}
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-sm text-gray-500">
+                {getDescription()}
+                {lastUpdated && (
+                  <span className="ml-2 text-xs text-gray-400">
+                    取得: {lastUpdated.toLocaleTimeString('ja-JP')}
+                  </span>
+                )}
+              </p>
+              <CacheStatusBadge
+                cacheSource={cacheSource}
+                cacheAge={cacheAge}
+                loading={loading}
+                onRefresh={handleRefresh}
+              />
+            </div>
           </div>
           <VisualizationSwitcher mode={visualizationMode} onModeChange={handleModeChange} />
         </div>

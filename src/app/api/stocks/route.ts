@@ -2,9 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import YahooFinance from 'yahoo-finance2';
 import { TechSubcategory } from '@/types/company';
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-// Japanese stock tickers (Tokyo Stock Exchange)
+// ===========================================
+// Server-side Cache Configuration
+// ===========================================
+const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+interface CacheEntry {
+  data: ReturnType<typeof transformQuotes>;
+  timestamp: number;
+  updatedAt: string;
+}
+
+let serverCache: CacheEntry | null = null;
+
+function isCacheValid(): boolean {
+  if (!serverCache) return false;
+  const now = Date.now();
+  return now - serverCache.timestamp < CACHE_DURATION_MS;
+}
+
+// ===========================================
+// Stock Tickers Configuration
+// ===========================================
 const DEFAULT_TICKERS = [
   // Technology - SaaS/Cloud
   '4478.T',  // freee
@@ -117,7 +138,9 @@ const DEFAULT_TICKERS = [
   '9503.T',  // Kansai Electric
 ];
 
-// Sector and subcategory mapping for Japanese stocks
+// ===========================================
+// Sector/Subcategory Mapping
+// ===========================================
 interface TickerInfo {
   sector: string;
   techSubcategory?: TechSubcategory;
@@ -235,6 +258,9 @@ const TICKER_INFO_MAP: Record<string, TickerInfo> = {
   '9503.T': { sector: 'utilities' },
 };
 
+// ===========================================
+// Types
+// ===========================================
 interface QuoteResult {
   symbol?: string;
   shortName?: string;
@@ -247,48 +273,92 @@ interface QuoteResult {
   trailingPE?: number;
 }
 
+// ===========================================
+// Data Transformation
+// ===========================================
+function transformQuotes(quotesArray: QuoteResult[]) {
+  return quotesArray
+    .filter(quote => quote && quote.symbol)
+    .map((quote) => {
+      const ticker = quote.symbol!;
+      const tickerInfo = TICKER_INFO_MAP[ticker] || { sector: 'technology' };
+
+      const volumeRatio = quote.regularMarketVolume && quote.averageDailyVolume3Month
+        ? Math.min(quote.regularMarketVolume / quote.averageDailyVolume3Month, 2) / 2
+        : 0.5;
+
+      return {
+        id: ticker,
+        ticker: ticker.replace('.T', ''),
+        name: quote.shortName || quote.longName || ticker,
+        sector: tickerInfo.sector,
+        techSubcategory: tickerInfo.techSubcategory,
+        marketCap: quote.marketCap ? Math.round(quote.marketCap / 100000000) : 0,
+        price: quote.regularMarketPrice || 0,
+        change: quote.regularMarketChangePercent || 0,
+        volume: volumeRatio,
+        per: quote.trailingPE || 0,
+      };
+    });
+}
+
+// ===========================================
+// API Handler
+// ===========================================
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const tickersParam = searchParams.get('tickers');
-  const tickers = tickersParam ? tickersParam.split(',') : DEFAULT_TICKERS;
+  const forceRefresh = searchParams.get('refresh') === 'true';
+
+  // Check server cache first (unless force refresh)
+  if (!forceRefresh && isCacheValid() && serverCache) {
+    console.log('[Cache] Returning server-cached data');
+    return NextResponse.json({
+      success: true,
+      data: serverCache.data,
+      updatedAt: serverCache.updatedAt,
+      cached: true,
+      cacheAge: Math.round((Date.now() - serverCache.timestamp) / 1000 / 60), // minutes
+    });
+  }
+
+  // Fetch fresh data from Yahoo Finance
+  console.log('[Cache] Fetching fresh data from Yahoo Finance');
 
   try {
-    const quotes = await yahooFinance.quote(tickers) as QuoteResult | QuoteResult[];
-
+    const quotes = await yahooFinance.quote(DEFAULT_TICKERS) as QuoteResult | QuoteResult[];
     const quotesArray: QuoteResult[] = Array.isArray(quotes) ? quotes : [quotes];
+    const companies = transformQuotes(quotesArray);
+    const updatedAt = new Date().toISOString();
 
-    const companies = quotesArray
-      .filter(quote => quote && quote.symbol) // Filter out null/undefined quotes
-      .map((quote) => {
-        const ticker = quote.symbol!;
-        const tickerInfo = TICKER_INFO_MAP[ticker] || { sector: 'technology' };
-
-        // Calculate volume as a normalized value (0-1)
-        const volumeRatio = quote.regularMarketVolume && quote.averageDailyVolume3Month
-          ? Math.min(quote.regularMarketVolume / quote.averageDailyVolume3Month, 2) / 2
-          : 0.5;
-
-        return {
-          id: ticker,
-          ticker: ticker.replace('.T', ''),
-          name: quote.shortName || quote.longName || ticker,
-          sector: tickerInfo.sector,
-          techSubcategory: tickerInfo.techSubcategory,
-          marketCap: quote.marketCap ? Math.round(quote.marketCap / 100000000) : 0,
-          price: quote.regularMarketPrice || 0,
-          change: quote.regularMarketChangePercent || 0,
-          volume: volumeRatio,
-          per: quote.trailingPE || 0,
-        };
-      });
+    // Update server cache
+    serverCache = {
+      data: companies,
+      timestamp: Date.now(),
+      updatedAt,
+    };
 
     return NextResponse.json({
       success: true,
       data: companies,
-      updatedAt: new Date().toISOString(),
+      updatedAt,
+      cached: false,
     });
   } catch (error) {
     console.error('Yahoo Finance API error:', error);
+
+    // If we have stale cache, return it with a warning
+    if (serverCache) {
+      console.log('[Cache] API failed, returning stale cache');
+      return NextResponse.json({
+        success: true,
+        data: serverCache.data,
+        updatedAt: serverCache.updatedAt,
+        cached: true,
+        stale: true,
+        cacheAge: Math.round((Date.now() - serverCache.timestamp) / 1000 / 60),
+      });
+    }
+
     return NextResponse.json(
       {
         success: false,
