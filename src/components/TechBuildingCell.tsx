@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { Company, SECTOR_COLORS } from '@/types/company';
+import { Company, SECTOR_COLORS, TECH_SUBCATEGORY_COLORS } from '@/types/company';
 
 interface TechBuildingCellProps {
   company: Company;
@@ -41,7 +41,10 @@ export function TechBuildingCell({ company, position, onClick, isSelected }: Tec
   // Height based on market cap
   const height = getHeightFromMarketCap(company.marketCap);
   const changeColor = getChangeColor(company.change);
-  const sectorColor = SECTOR_COLORS[company.sector];
+  // Use subcategory color if available, otherwise sector color
+  const buildingColor = company.techSubcategory
+    ? TECH_SUBCATEGORY_COLORS[company.techSubcategory]
+    : SECTOR_COLORS[company.sector];
 
   // Base width
   const baseWidth = 0.4;
@@ -78,7 +81,7 @@ export function TechBuildingCell({ company, position, onClick, isSelected }: Tec
       >
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial
-          color={sectorColor}
+          color={buildingColor}
           transparent
           opacity={0.9}
           roughness={0.3}

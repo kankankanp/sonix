@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Company, Sector } from '@/types/company';
+import { Company, Sector, TechSubcategory, ALL_TECH_SUBCATEGORIES } from '@/types/company';
 import { CompanyInfoPanel } from '@/components/CompanyInfoPanel';
 import { SectorLegend, ALL_SECTORS } from '@/components/SectorLegend';
+import { TechSubcategoryLegend } from '@/components/TechSubcategoryLegend';
 import { VisualizationSwitcher, VisualizationMode } from '@/components/VisualizationSwitcher';
 import { useStockData } from '@/hooks/useStockData';
 
@@ -36,9 +37,12 @@ export default function Home() {
   // Company selection state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [selectedSectors, setSelectedSectors] = useState<Sector[]>(ALL_SECTORS);
+  const [selectedTechSubcategories, setSelectedTechSubcategories] = useState<TechSubcategory[]>(ALL_TECH_SUBCATEGORIES);
 
   // Visualization mode
   const [visualizationMode, setVisualizationMode] = useState<VisualizationMode>('cellular');
+
+  const isChaosMapMode = visualizationMode === 'chaosmap';
 
   // Stock data - fetch from Yahoo Finance API
   const { companies, loading, error, lastUpdated } = useStockData({
@@ -46,11 +50,20 @@ export default function Home() {
     refreshInterval: 6 * 60 * 60 * 1000, // Refresh every 6 hours
   });
 
-  // Filter companies by selected sectors
+  // Filter companies by selected sectors (for non-chaos map modes)
   const filteredCompanies = useMemo(() => {
     if (selectedSectors.length === 0) return [];
     return companies.filter((company) => selectedSectors.includes(company.sector));
   }, [companies, selectedSectors]);
+
+  // Count tech companies for chaos map
+  const techCompanyCount = useMemo(() => {
+    return companies.filter(c =>
+      c.sector === 'technology' &&
+      c.techSubcategory &&
+      selectedTechSubcategories.includes(c.techSubcategory)
+    ).length;
+  }, [companies, selectedTechSubcategories]);
 
   // Handlers for sectors
   const handleSectorToggle = (sector: Sector) => {
@@ -60,6 +73,15 @@ export default function Home() {
   };
   const handleSelectAllSectors = () => setSelectedSectors(ALL_SECTORS);
   const handleClearAllSectors = () => setSelectedSectors([]);
+
+  // Handlers for tech subcategories
+  const handleTechSubcategoryToggle = (subcategory: TechSubcategory) => {
+    setSelectedTechSubcategories((prev) =>
+      prev.includes(subcategory) ? prev.filter((s) => s !== subcategory) : [...prev, subcategory]
+    );
+  };
+  const handleSelectAllTechSubcategories = () => setSelectedTechSubcategories(ALL_TECH_SUBCATEGORIES);
+  const handleClearAllTechSubcategories = () => setSelectedTechSubcategories([]);
 
   // Mode change handler - reset selection
   const handleModeChange = (mode: VisualizationMode) => {
@@ -75,7 +97,7 @@ export default function Home() {
       case 'cityscape':
         return 'City Scape Market';
       case 'chaosmap':
-        return 'Chaos Map';
+        return 'Tech Chaos Map';
       default:
         return 'Market Visualization';
     }
@@ -88,7 +110,7 @@ export default function Home() {
       case 'cityscape':
         return '日本株式市場 3D可視化（都市方式）';
       case 'chaosmap':
-        return '日本株式市場 カオスマップ';
+        return 'テクノロジー業界 カオスマップ';
       default:
         return '日本株式市場 3D可視化';
     }
@@ -117,7 +139,7 @@ export default function Home() {
             companies={companies}
             selectedCompany={selectedCompany}
             onSelectCompany={setSelectedCompany}
-            selectedSectors={selectedSectors}
+            selectedSubcategories={selectedTechSubcategories}
           />
         )}
       </div>
@@ -149,12 +171,21 @@ export default function Home() {
 
       {/* Filter (Bottom left) */}
       <div className="absolute bottom-4 left-4 z-10">
-        <SectorLegend
-          selectedSectors={selectedSectors}
-          onSectorToggle={handleSectorToggle}
-          onSelectAll={handleSelectAllSectors}
-          onClearAll={handleClearAllSectors}
-        />
+        {isChaosMapMode ? (
+          <TechSubcategoryLegend
+            selectedSubcategories={selectedTechSubcategories}
+            onSubcategoryToggle={handleTechSubcategoryToggle}
+            onSelectAll={handleSelectAllTechSubcategories}
+            onClearAll={handleClearAllTechSubcategories}
+          />
+        ) : (
+          <SectorLegend
+            selectedSectors={selectedSectors}
+            onSectorToggle={handleSectorToggle}
+            onSelectAll={handleSelectAllSectors}
+            onClearAll={handleClearAllSectors}
+          />
+        )}
       </div>
 
       {/* Legend (Bottom right) */}
@@ -187,7 +218,9 @@ export default function Home() {
       <div className="absolute top-20 left-4 z-10">
         <div className="bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 px-3 py-2">
           <span className="text-sm text-gray-700">
-            表示中: <span className="font-bold">{filteredCompanies.length}</span> 社
+            表示中: <span className="font-bold">
+              {isChaosMapMode ? techCompanyCount : filteredCompanies.length}
+            </span> 社
           </span>
         </div>
       </div>

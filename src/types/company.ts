@@ -1,8 +1,18 @@
+export type TechSubcategory =
+  | 'saas'           // SaaS/クラウド
+  | 'gaming'         // ゲーム
+  | 'ecommerce'      // EC/インターネット
+  | 'semiconductor'  // 半導体/電子部品
+  | 'itServices'     // ITサービス
+  | 'software'       // ソフトウェア
+  | 'hardware';      // ハードウェア
+
 export interface Company {
   id: string;
   ticker: string;           // ティッカーシンボル
   name: string;             // 企業名
   sector: Sector;           // セクター
+  techSubcategory?: TechSubcategory; // テクノロジーサブカテゴリ（テクノロジーセクターのみ）
   marketCap: number;        // 時価総額（億円）
   price: number;            // 現在株価
   change: number;           // 騰落率（%）
@@ -49,6 +59,39 @@ export const SECTOR_NAMES: Record<Sector, string> = {
   realEstate: '不動産',
 };
 
+// テクノロジーサブカテゴリの色
+export const TECH_SUBCATEGORY_COLORS: Record<TechSubcategory, string> = {
+  saas: '#8b5cf6',         // バイオレット
+  gaming: '#ec4899',       // ピンク
+  ecommerce: '#f59e0b',    // アンバー
+  semiconductor: '#06b6d4', // シアン
+  itServices: '#6366f1',   // インディゴ
+  software: '#22c55e',     // グリーン
+  hardware: '#64748b',     // スレート
+};
+
+// テクノロジーサブカテゴリの名前
+export const TECH_SUBCATEGORY_NAMES: Record<TechSubcategory, string> = {
+  saas: 'SaaS/クラウド',
+  gaming: 'ゲーム',
+  ecommerce: 'EC/インターネット',
+  semiconductor: '半導体/電子部品',
+  itServices: 'ITサービス',
+  software: 'ソフトウェア',
+  hardware: 'ハードウェア',
+};
+
+// 全テクノロジーサブカテゴリ
+export const ALL_TECH_SUBCATEGORIES: TechSubcategory[] = [
+  'saas',
+  'gaming',
+  'ecommerce',
+  'semiconductor',
+  'itServices',
+  'software',
+  'hardware',
+];
+
 // セクターごとの3D空間での位置（クラスター中心）
 export const SECTOR_POSITIONS: Record<Sector, [number, number, number]> = {
   technology: [0, 2, 0],
@@ -61,4 +104,15 @@ export const SECTOR_POSITIONS: Record<Sector, [number, number, number]> = {
   telecom: [3, -2, -1],
   utilities: [-3, -2, 1],
   realEstate: [0, 0, 3],
+};
+
+// テクノロジーサブカテゴリごとの3D空間での位置（カオスマップ用）
+export const TECH_SUBCATEGORY_POSITIONS: Record<TechSubcategory, [number, number]> = {
+  saas: [-6, -4],
+  gaming: [0, -6],
+  ecommerce: [6, -4],
+  semiconductor: [-6, 2],
+  itServices: [0, 0],
+  software: [6, 2],
+  hardware: [0, 6],
 };

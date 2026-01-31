@@ -3,49 +3,37 @@
 import { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei';
-import { Company, Sector, SECTOR_COLORS, SECTOR_NAMES } from '@/types/company';
+import { Company, TechSubcategory, TECH_SUBCATEGORY_COLORS, TECH_SUBCATEGORY_NAMES, TECH_SUBCATEGORY_POSITIONS } from '@/types/company';
 import { TechBuildingCell } from './TechBuildingCell';
 
 interface ChaosMapSceneProps {
   companies: Company[];
   selectedCompany: Company | null;
   onSelectCompany: (company: Company | null) => void;
-  selectedSectors: Sector[];
+  selectedSubcategories: TechSubcategory[];
 }
 
-// Grid positions for companies - organized by sector
+// Grid positions for companies - organized by tech subcategory
 function getCompanyPositions(companies: Company[]): Map<string, [number, number, number]> {
   const positions = new Map<string, [number, number, number]>();
 
-  // Group companies by sector
-  const bySector = new Map<Sector, Company[]>();
+  // Group companies by tech subcategory
+  const bySubcategory = new Map<TechSubcategory, Company[]>();
   companies.forEach(company => {
-    const list = bySector.get(company.sector) || [];
-    list.push(company);
-    bySector.set(company.sector, list);
+    if (company.techSubcategory) {
+      const list = bySubcategory.get(company.techSubcategory) || [];
+      list.push(company);
+      bySubcategory.set(company.techSubcategory, list);
+    }
   });
 
-  // Sector cluster centers
-  const sectorCenters: Record<Sector, [number, number]> = {
-    technology: [0, 0],
-    finance: [6, 0],
-    healthcare: [-6, 0],
-    consumer: [3, 5],
-    industrial: [-3, 5],
-    energy: [6, -5],
-    materials: [-6, -5],
-    telecom: [0, 5],
-    utilities: [3, -5],
-    realEstate: [-3, -5],
-  };
-
-  // Place companies in a grid pattern around their sector center
-  bySector.forEach((sectorCompanies, sector) => {
-    const [cx, cz] = sectorCenters[sector];
-    const gridSize = Math.ceil(Math.sqrt(sectorCompanies.length));
+  // Place companies in a grid pattern around their subcategory center
+  bySubcategory.forEach((subcategoryCompanies, subcategory) => {
+    const [cx, cz] = TECH_SUBCATEGORY_POSITIONS[subcategory];
+    const gridSize = Math.ceil(Math.sqrt(subcategoryCompanies.length));
     const spacing = 1.2;
 
-    sectorCompanies.forEach((company, idx) => {
+    subcategoryCompanies.forEach((company, idx) => {
       const row = Math.floor(idx / gridSize);
       const col = idx % gridSize;
       const offsetX = (col - (gridSize - 1) / 2) * spacing;
@@ -57,64 +45,58 @@ function getCompanyPositions(companies: Company[]): Map<string, [number, number,
   return positions;
 }
 
-function SectorLabel({ sector, companies }: { sector: Sector; companies: Company[] }) {
-  // Calculate center position for this sector's companies
-  const sectorCompanies = companies.filter(c => c.sector === sector);
-  if (sectorCompanies.length === 0) return null;
+function SubcategoryLabel({ subcategory, companies }: { subcategory: TechSubcategory; companies: Company[] }) {
+  // Calculate center position for this subcategory's companies
+  const subcategoryCompanies = companies.filter(c => c.techSubcategory === subcategory);
+  if (subcategoryCompanies.length === 0) return null;
 
-  const sectorCenters: Record<Sector, [number, number]> = {
-    technology: [0, 0],
-    finance: [6, 0],
-    healthcare: [-6, 0],
-    consumer: [3, 5],
-    industrial: [-3, 5],
-    energy: [6, -5],
-    materials: [-6, -5],
-    telecom: [0, 5],
-    utilities: [3, -5],
-    realEstate: [-3, -5],
-  };
-
-  const [cx, cz] = sectorCenters[sector];
-  const color = SECTOR_COLORS[sector];
-  const name = SECTOR_NAMES[sector];
+  const [cx, cz] = TECH_SUBCATEGORY_POSITIONS[subcategory];
+  const color = TECH_SUBCATEGORY_COLORS[subcategory];
+  const name = TECH_SUBCATEGORY_NAMES[subcategory];
 
   return (
     <group position={[cx, 0, cz]}>
       {/* Category area indicator */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-        <circleGeometry args={[2.5, 32]} />
-        <meshBasicMaterial color={color} transparent opacity={0.08} />
+        <circleGeometry args={[2.8, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.1} />
       </mesh>
 
       {/* Category name using Html */}
-      <Html position={[0, 0.1, 3]} center style={{ pointerEvents: 'none' }}>
+      <Html position={[0, 0.1, 3.5]} center style={{ pointerEvents: 'none' }}>
         <div
           className="text-sm font-bold whitespace-nowrap px-2 py-1 rounded"
-          style={{ color, backgroundColor: 'rgba(255,255,255,0.8)' }}
+          style={{ color, backgroundColor: 'rgba(255,255,255,0.9)' }}
         >
-          {name} ({sectorCompanies.length})
+          {name} ({subcategoryCompanies.length})
         </div>
       </Html>
     </group>
   );
 }
 
-function ChaosMapScene({ companies, selectedCompany, onSelectCompany, selectedSectors }: ChaosMapSceneProps) {
+function ChaosMapScene({ companies, selectedCompany, onSelectCompany, selectedSubcategories }: ChaosMapSceneProps) {
+  // Filter to only technology companies with matching subcategories
   const filteredCompanies = useMemo(() => {
-    if (selectedSectors.length === 0) return [];
-    return companies.filter(c => selectedSectors.includes(c.sector));
-  }, [companies, selectedSectors]);
+    if (selectedSubcategories.length === 0) return [];
+    return companies.filter(c =>
+      c.sector === 'technology' &&
+      c.techSubcategory &&
+      selectedSubcategories.includes(c.techSubcategory)
+    );
+  }, [companies, selectedSubcategories]);
 
   const positions = useMemo(() => {
     return getCompanyPositions(filteredCompanies);
   }, [filteredCompanies]);
 
-  // Get unique sectors that have companies
-  const activeSectors = useMemo(() => {
-    const sectors = new Set<Sector>();
-    filteredCompanies.forEach(c => sectors.add(c.sector));
-    return Array.from(sectors);
+  // Get unique subcategories that have companies
+  const activeSubcategories = useMemo(() => {
+    const subcategories = new Set<TechSubcategory>();
+    filteredCompanies.forEach(c => {
+      if (c.techSubcategory) subcategories.add(c.techSubcategory);
+    });
+    return Array.from(subcategories);
   }, [filteredCompanies]);
 
   return (
@@ -130,13 +112,13 @@ function ChaosMapScene({ companies, selectedCompany, onSelectCompany, selectedSe
 
       {/* Ground */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[30, 30]} />
+        <planeGeometry args={[35, 35]} />
         <meshStandardMaterial color="#e2e8f0" />
       </mesh>
 
-      {/* Sector labels */}
-      {activeSectors.map(sector => (
-        <SectorLabel key={sector} sector={sector} companies={filteredCompanies} />
+      {/* Subcategory labels */}
+      {activeSubcategories.map(subcategory => (
+        <SubcategoryLabel key={subcategory} subcategory={subcategory} companies={filteredCompanies} />
       ))}
 
       {/* Companies as buildings */}
@@ -155,7 +137,7 @@ function ChaosMapScene({ companies, selectedCompany, onSelectCompany, selectedSe
       })}
 
       {/* Grid */}
-      <gridHelper args={[30, 30, '#cbd5e1', '#e2e8f0']} position={[0, 0.01, 0]} />
+      <gridHelper args={[35, 35, '#cbd5e1', '#e2e8f0']} position={[0, 0.01, 0]} />
     </>
   );
 }
@@ -164,10 +146,10 @@ interface ChaosMapMarketProps {
   companies: Company[];
   selectedCompany: Company | null;
   onSelectCompany: (company: Company | null) => void;
-  selectedSectors: Sector[];
+  selectedSubcategories: TechSubcategory[];
 }
 
-export function ChaosMapMarket({ companies, selectedCompany, onSelectCompany, selectedSectors }: ChaosMapMarketProps) {
+export function ChaosMapMarket({ companies, selectedCompany, onSelectCompany, selectedSubcategories }: ChaosMapMarketProps) {
   return (
     <div className="w-full h-full">
       <Canvas
@@ -176,13 +158,13 @@ export function ChaosMapMarket({ companies, selectedCompany, onSelectCompany, se
         dpr={[1, 2]}
         onPointerMissed={() => onSelectCompany(null)}
       >
-        <PerspectiveCamera makeDefault position={[12, 15, 12]} fov={50} />
+        <PerspectiveCamera makeDefault position={[15, 18, 15]} fov={50} />
         <OrbitControls
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
           minDistance={8}
-          maxDistance={40}
+          maxDistance={50}
           maxPolarAngle={Math.PI / 2.2}
           target={[0, 2, 0]}
         />
@@ -190,7 +172,7 @@ export function ChaosMapMarket({ companies, selectedCompany, onSelectCompany, se
           companies={companies}
           selectedCompany={selectedCompany}
           onSelectCompany={onSelectCompany}
-          selectedSectors={selectedSectors}
+          selectedSubcategories={selectedSubcategories}
         />
       </Canvas>
     </div>
