@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Music Memory Globe",
-  description: "あなただけの音楽の思い出マップ - 時間×場所×音楽の3D地球儀",
+  title: "Cellular Market - 3D株式可視化",
+  description: "日本株市場をagar.io風の3D空間で可視化 - 時価総額、騰落率、セクターを直感的に把握",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" className="dark">
+    <html lang="ja">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
